@@ -1,35 +1,43 @@
 import logging
-import sys
 import time
+from http import HTTPStatus
 
 import requests
-from telebot import TeleBot
+from telebot import TeleBot, apihelper
 
+from exceptions import TokenNotFoundException
 from settings import (ENDPOINT, HEADERS, HOMEWORK_VERDICTS, PRACTICUM_TOKEN,
                       RETRY_PERIOD, TELEGRAM_CHAT_ID, TELEGRAM_TOKEN)
 
 
 def check_tokens():
     """Проверяет наличие необходимых токенов для работы бота."""
-    practicum_token = PRACTICUM_TOKEN
-    telegram_token = TELEGRAM_TOKEN
-    telegram_chat_id = TELEGRAM_CHAT_ID
-
-    if not practicum_token or not telegram_token or not telegram_chat_id:
-        logging.critical(
-            'Отсутствует какая-то из переменных окружения — продолжать '
-            'работу бота нет смысла.'
+    tokens = {
+        'Токен Практикума': PRACTICUM_TOKEN,
+        'Токен Бота': TELEGRAM_TOKEN,
+        'ID чата': TELEGRAM_CHAT_ID,
+    }
+    result = []
+    for name, token in tokens.items():
+        if not token:
+            result.append(name)
+    if result:
+        answer = (
+            'Бот не  запущен, отсутствуют переменные окружения:'
+            '\n' + '\n'.join(result)
         )
-        sys.exit()
-    return True
+        logging.critical(answer)
+        raise TokenNotFoundException(answer)
 
 
 def send_message(bot: TeleBot, message: str):
     """Функция отправки сообщения."""
     try:
+        logging.debug('Попытка отправки сообщения в Telegram...')
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logging.debug('Удачная отправка сообщения в Telegram.')
-    except Exception as e:
+    except (apihelper.ApiException,
+            requests.exceptions.RequestException) as e:
         logging.error(f'Сбой при отправке сообщения в Telegram: {e}')
 
 
@@ -37,10 +45,22 @@ def get_api_answer(timestamp: time):
     """Получение ответа от API, приведение к типам данных Python."""
     payload = {'from_date': timestamp}
     try:
-        homework_statuses = requests.get(
-            ENDPOINT, headers=HEADERS, params=payload
+        api_answer_args = {
+            'URL:': ENDPOINT,
+            'Заголовок:': HEADERS,
+            'Параметры:': payload,
+        }
+        url, title, params = api_answer_args.items()
+        logging.debug(
+            'Попытка запроса к API с данными:\n'
+            f'{url[0]}: {url[1]}\n'
+            f'{title[0]}: {title[1]}\n'
+            f'{params[0]}: {params[1]}'
         )
-        if homework_statuses.status_code != 200:
+        homework_statuses = requests.get(
+            url[1], headers=title[1], params=params[1],
+        )
+        if homework_statuses.status_code != HTTPStatus.OK:
             logging.error(
                 f'Код ответа для запроса API {homework_statuses.url}'
             )
