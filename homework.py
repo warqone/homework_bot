@@ -123,13 +123,13 @@ def main():
                 send_status = send_message(bot, message)
                 if send_status is True:
                     timestamp = homework.get('current_date', timestamp)
-                else:
                     last_message = ''
             else:
                 logging.debug('Нет новых изменений в статусах.')
         except Exception as error:
             logging.error(f'Сбой в работе программы: {error}')
             message = f'Сбой в работе программы: {error}'
+            last_message = message
             if message != last_message:
                 send_message(bot, message)
         finally:
