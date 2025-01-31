@@ -130,7 +130,12 @@ def parse_status(homework: dict):
         logging.error(message)
         raise exc.ApiResponseAndParseKeyError(message)
     if verdict not in HOMEWORK_VERDICTS:
-        raise exc.WaitedHomeWorkVerdictError(verdict, HOMEWORK_VERDICTS)
+        message = (
+            f'Вердикт {verdict} отсутсвует в списке ожидаемых вердиктов:\n'
+            f'{HOMEWORK_VERDICTS}'
+        )
+        logging.error(message)
+        raise exc.WaitedHomeWorkVerdictError(message)
 
     return (
         f'Изменился статус проверки работы "{homework_name}". '

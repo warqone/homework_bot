@@ -1,6 +1,3 @@
-from requests.exceptions import RequestException
-
-
 class TokenNotFoundException(Exception):
     """Не найдена одна или несколько переменных окружения."""
 
@@ -9,7 +6,7 @@ class TokenNotFoundException(Exception):
         super().__init__(message)
 
 
-class RequestApiError(RequestException):
+class RequestApiError(Exception):
     """Ошибка при попытке запроса к API."""
 
     def __init__(self, message):
@@ -35,6 +32,14 @@ class ApiResponseTypeError(TypeError):
 
 class ApiResponseAndParseKeyError(KeyError):
     """API вернул не ожидаемый набор ключей."""
+
+    def __init__(self, message):
+        """Добавление подробной информации об ошибке."""
+        super().__init__(message)
+
+
+class WaitedHomeWorkVerdictError(ValueError):
+    """Был получен вердикт которого нет в списке ожидаемых."""
 
     def __init__(self, message):
         """Добавление подробной информации об ошибке."""
