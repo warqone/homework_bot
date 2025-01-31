@@ -23,7 +23,12 @@ def check_tokens():
         if not token:
             result.append(name)
     if result:
-        raise exc.TokenNotFoundException(result)
+        message = (
+            'Бот не  запущен, отсутствуют переменные окружения:'
+            '\n' + '\n'.join(result)
+        )
+        logging.critical(message)
+        raise exc.TokenNotFoundException(message)
 
 
 def send_message(bot: TeleBot, message: str):
@@ -44,29 +49,30 @@ def get_api_answer(timestamp: time):
     payload = {'from_date': timestamp}
     try:
         api_args = {
-            'URL': ENDPOINT,
-            'Title': HEADERS,
-            'Parametres': payload,
+            'url': ENDPOINT,
+            'headers': HEADERS,
+            'params': payload,
         }
         logging.debug(
             'Попытка запроса к API с данными:\n'
-            'URL: {0}\n'
-            'Title: {1}\n'
-            'Parametres: {2}'.format(
-                api_args['URL'],
-                api_args['Title'],
-                api_args['Parametres'],
-            )
+            'URL: {url}\n'
+            'Headers: {headers}\n'
+            'Parametres: {params}'.format(**api_args)
         )
-        homework_statuses = requests.get(
-            api_args['URL'],
-            headers=api_args['Title'],
-            params=api_args['Parametres'],
-        )
+        homework_statuses = requests.get(**api_args)
     except requests.exceptions.RequestException as e:
-        logging.error(f'Ошибка при попытке запроса к API: {e}')
+        message = (
+            f'Возникла ошибка при попытке запроса к API: {e},'
+        )
+        logging.error(message)
+        raise exc.RequestApiError(message)
     if homework_statuses.status_code != HTTPStatus.OK:
-        raise exc.ApiAnswerStatusCodeError(homework_statuses.status_code)
+        message = (
+            f'Код ответа от API: {homework_statuses.status_code} - '
+            'не соответствует ожидаемому.'
+        )
+        logging.error(message)
+        raise exc.ApiAnswerStatusCodeError(message)
     return homework_statuses.json()
 
 
@@ -74,15 +80,30 @@ def check_response(response: dict):
     """Проверка на наличие ключей в ответе API."""
     if not isinstance(response, dict):
         response_type = type(response)
-        raise exc.ApiResponseTypeError(response_type, dict)
+        message = (
+            f'Ответ API вернул не ожидаемый тип данных: "{response_type}"'
+            f'вместо "{dict}"'
+        )
+        logging.error(message)
+        raise exc.ApiResponseTypeError(message)
     try:
         target_key = 'homeworks'
         homeworks = response[target_key]
     except KeyError:
-        raise exc.ApiResponseAndParseKeyError(target_key, response)
+        message = (
+            f'Отсутствует ожидаемый ключ {target_key} в словаре: '
+            f'{homeworks}'
+        )
+        logging.error(message)
+        raise exc.ApiResponseAndParseKeyError(message)
     if not isinstance(homeworks, list):
         response_type = type(homeworks)
-        raise exc.ApiResponseTypeError(response_type, list)
+        message = (
+            f'Ответ API вернул не ожидаемый тип данных: "{response_type}"'
+            f'вместо "{dict}"'
+        )
+        logging.error(message)
+        raise exc.ApiResponseTypeError(message)
     return homeworks
 
 
@@ -92,12 +113,22 @@ def parse_status(homework: dict):
         target_key = 'homework_name'
         homework_name = homework[target_key]
     except KeyError:
-        raise exc.ApiResponseAndParseKeyError(target_key, homework)
+        message = (
+            f'Отсутствует ожидаемый ключ {target_key} в словаре: '
+            f'{homework}'
+        )
+        logging.error(message)
+        raise exc.ApiResponseAndParseKeyError(message)
     try:
         target_key = 'status'
         verdict = homework[target_key]
     except KeyError:
-        raise exc.ApiResponseAndParseKeyError(target_key, homework)
+        message = (
+            f'Отсутствует ожидаемый ключ {target_key} в словаре: '
+            f'{homework}'
+        )
+        logging.error(message)
+        raise exc.ApiResponseAndParseKeyError(message)
     if verdict not in HOMEWORK_VERDICTS:
         raise exc.WaitedHomeWorkVerdictError(verdict, HOMEWORK_VERDICTS)
 
@@ -121,7 +152,7 @@ def main():
                 homework = dict(homeworks[0])
                 message = parse_status(homework)
                 send_status = send_message(bot, message)
-                if send_status is True:
+                if send_status:
                     timestamp = homework.get('current_date', timestamp)
                     last_message = ''
             else:
@@ -129,8 +160,8 @@ def main():
         except Exception as error:
             logging.error(f'Сбой в работе программы: {error}')
             message = f'Сбой в работе программы: {error}'
-            last_message = message
             if message != last_message:
+                last_message = message
                 send_message(bot, message)
         finally:
             time.sleep(RETRY_PERIOD)
@@ -139,8 +170,10 @@ def main():
 if __name__ == '__main__':
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-
     stdout_handler = logging.StreamHandler(sys.stdout)
-
+    formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s'
+    )
+    stdout_handler.setFormatter(formatter)
     logger.addHandler(stdout_handler)
     main()
