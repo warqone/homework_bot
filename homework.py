@@ -64,14 +64,12 @@ def get_api_answer(timestamp: time):
         message = (
             f'Возникла ошибка при попытке запроса к API: {e},'
         )
-        logging.error(message)
         raise exc.RequestApiError(message)
     if homework_statuses.status_code != HTTPStatus.OK:
         message = (
             f'Код ответа от API: {homework_statuses.status_code} - '
             'не соответствует ожидаемому.'
         )
-        logging.error(message)
         raise exc.ApiAnswerStatusCodeError(message)
     return homework_statuses.json()
 
@@ -84,7 +82,6 @@ def check_response(response: dict):
             f'Ответ API вернул не ожидаемый тип данных: "{response_type}"'
             f'вместо "{dict}"'
         )
-        logging.error(message)
         raise exc.ApiResponseTypeError(message)
     try:
         target_key = 'homeworks'
@@ -94,15 +91,13 @@ def check_response(response: dict):
             f'Отсутствует ожидаемый ключ {target_key} в словаре: '
             f'{homeworks}'
         )
-        logging.error(message)
         raise exc.ApiResponseAndParseKeyError(message)
     if not isinstance(homeworks, list):
         response_type = type(homeworks)
         message = (
             f'Ответ API вернул не ожидаемый тип данных: "{response_type}"'
-            f'вместо "{dict}"'
+            f'вместо "{list}"'
         )
-        logging.error(message)
         raise exc.ApiResponseTypeError(message)
     return homeworks
 
@@ -117,7 +112,6 @@ def parse_status(homework: dict):
             f'Отсутствует ожидаемый ключ {target_key} в словаре: '
             f'{homework}'
         )
-        logging.error(message)
         raise exc.ApiResponseAndParseKeyError(message)
     try:
         target_key = 'status'
@@ -127,14 +121,12 @@ def parse_status(homework: dict):
             f'Отсутствует ожидаемый ключ {target_key} в словаре: '
             f'{homework}'
         )
-        logging.error(message)
         raise exc.ApiResponseAndParseKeyError(message)
     if verdict not in HOMEWORK_VERDICTS:
         message = (
             f'Вердикт {verdict} отсутсвует в списке ожидаемых вердиктов:\n'
             f'{HOMEWORK_VERDICTS}'
         )
-        logging.error(message)
         raise exc.WaitedHomeWorkVerdictError(message)
 
     return (
@@ -154,7 +146,7 @@ def main():
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
             if homeworks:
-                homework = dict(homeworks[0])
+                homework = homeworks[0]
                 message = parse_status(homework)
                 send_status = send_message(bot, message)
                 if send_status:
